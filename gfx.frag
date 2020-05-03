@@ -28,7 +28,7 @@ const float pi = acos(-1.);
 const vec3 c = vec3(1.,0.,-1.);
 const float box_size = .45,
     depth = 7.,
-    psize = 2.;
+    dz = -.01;
 
 // Creative Commons Attribution-ShareAlike 4.0 International Public License
 // Created by David Hoskins.
@@ -95,7 +95,7 @@ void main_scene(in vec3 x, out vec2 sdf)
         size = box_size,
         r;
 
-    sdf = vec2(x.z+box_size,0.);
+    sdf = vec2(x.z+box_size-dz,0.);
         
     for(float i=0.; i<depth; i+=1.)
     {
@@ -119,8 +119,10 @@ void main_scene(in vec3 x, out vec2 sdf)
         }
         size /= 2.;
     }
-    dbox3(x+box_size*c.yyx, vec3(box_size*c.xx, .01), d);
-    add(sdf, vec2(d, -1.), sdf);
+    vec3 yi = vec3(-1.,-1.,-1.);
+    hash13(1.e2*yi, r);
+    dbox3_wireframe(x-.5*yi*box_size, .525*r*box_size*c.xxx, .28*.5*r*box_size, d);
+    add(sdf, vec2(d, 1.), sdf);
 }
 
 #define normal(o, t)void o(in vec3 x, out vec3 n, in float dx){vec2 s, na;t(x,s);t(x+dx*c.xyy, na);n.x = na.x;t(x+dx*c.yxy, na);n.y = na.x;t(x+dx*c.yyx, na);n.z = na.x;n = normalize(n-s.x);} 
@@ -156,7 +158,7 @@ void illuminate(in vec3 x, in vec3 n, in vec3 dir, in vec3 l, inout vec3 col, in
     }
     else if(s.y == 0.) // Floor
     {
-        col = .2*c.xxx;
+        col = .1*c.xxx;
         col = .1*col
             + .8*col*max(dot(l-x,n),0.)
             + .5*col*pow(max(dot(reflect(l-x,n),dir),0.),2.);
@@ -207,6 +209,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         x,
         c1 = c.yyy,
         l,
+        l2,
         dir0,
         x0,
         c2,
@@ -221,13 +224,14 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     analytical_box(o, dir, box_size*c.xxx, d);
     if(d > 1.e1) 
     {
-        d = -(o.z+box_size-.01)/dir.z;
+        d = -(o.z+box_size-dz)/dir.z;
     	x = o + d * dir;
         main_scene(x,s);
     }
     march_main(x, o, d, dir, N, i, s);
     
     l = c.xzx;
+    l2 = c.zxx;
     
     if(i<N)
     {
@@ -236,7 +240,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     else
     {
-    	d = -(o.z+box_size-.01)/dir.z;
+    	d = -(o.z+box_size-dz)/dir.z;
     	x = o + d * dir;
         main_scene(x,s);
         main_normal(x, n, 5.e-5);
@@ -244,6 +248,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     
     illuminate(x, n, dir, l, col, s);
+    illuminate(x, n, dir, l2, c1, s);
+    col = mix(col, c1, .5);
     
     if(s.y == 0.)
     {
@@ -258,30 +264,91 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             main_normal(x0, n0, 5.e-4);
             n = round(n);
             illuminate(x0, n0, dir0, l, c1, s0);
-        	col = mix(col, c1, .3);
+            illuminate(x0, n0, dir0, l2, c2, s0);
+            c1 = mix(c1, c2, .5);
+        	col = mix(col, c1, .1);
         }
     }
     
-    //if(s.y == 0.)
+    
+    // Hard shadow
+    // {
+    //     o = x;
+    //     dir = normalize(l-x);
+    //     d = 1.e-2;
+        
+    //     march_shadow(x, o, d, dir, N, i, s);
+        
+    //     if(x.z<.5)
+    //     {
+    //         //col = c.xyy;
+    //         col *= .6;
+    //     }
+    // }
+
+    // Soft shadow
+    x0 = x;
+
+    o = x;
+    dir = normalize(l-x);
+    d = 1.e-2;
+    // analytical_box(o, dir, box_size*c.xxx, d);
+    
+    // if(d < 1.e2)
     {
-        o = x;
-        dir = normalize(l-x);
-        d = 1.e-2;
-        
-        march_shadow(x, o, d, dir, N, i, s);
-        
-        if(x.z<.5)
+        float res = 1.0;
+        float ph = 1e20;
+        for(int i=0; i<N; ++i)
+        // for(d=1.e-2; x.z<.5; )
         {
-            //col = c.xyy;
-            col *= .6;
+            x = o + d * dir;
+            main_scene(x, s);
+            if(s.x < 1.e-4) 
+            {
+                res = 0.;
+                break;
+            }
+            if(x.z>.5) break;
+            float y = s.x*s.x/(2.0*ph);
+            float da = sqrt(s.x*s.x-y*y);
+            res = min( res, 100.0*da/max(0.0,d-y) );
+            ph = s.x;
+            d += min(s.x,5.e-3);
         }
+        col = mix(.3*col, col, res);
     }
 
+    // o = x0;
+    // dir = normalize(l2-x0);
+    // d = 1.e-2;
+    // {
+    //     float res = 1.0;
+    //     float ph = 1e20;
+    //     for(int i=0; i<N; ++i)
+    //     // for(d=1.e-2; x.z<.5; )
+    //     {
+    //         x = o + d * dir;
+    //         main_scene(x, s);
+    //         if(s.x < 1.e-4) 
+    //         {
+    //             res = 0.;
+    //             break;
+    //         }
+    //         if(x.z>.5) break;
+    //         float y = s.x*s.x/(2.0*ph);
+    //         float da = sqrt(s.x*s.x-y*y);
+    //         res = min( res, 100.0*da/max(0.0,d-y) );
+    //         ph = s.x;
+    //         d += min(s.x,5.e-3);
+    //     }
+    //     col = mix(.6*col, col, res);
+    // }
     // Ambient
 	//col *= (1.+1./length(x-l));
     
     // Gamma
     col = col + 1.*col*col*col;
+    // col *= col;
     //col = col + 1.*col*col;
     
     fragColor = vec4(clamp(col,0.,1.),1.);
