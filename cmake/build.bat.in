@@ -1,0 +1,20 @@
+REM ${PROJECT_NAME} - 4k executable GFX by NR4/Team210
+REM Copyright (C) 2019 Alexander Kraus <nr4@z10.info>
+REM Copyright (C) 2019 DaDummy <c.anselm@paindevs.com>
+REM 
+REM This program is free software: you can redistribute it and/or modify
+REM it under the terms of the GNU General Public License as published by
+REM the Free Software Foundation, either version 3 of the License, or
+REM (at your option) any later version.
+REM 
+REM This program is distributed in the hope that it will be useful,
+REM but WITHOUT ANY WARRANTY; without even the implied warranty of
+REM MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+REM GNU General Public License for more details.
+REM 
+REM You should have received a copy of the GNU General Public License
+REM along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}\generator.py ${PROJECT_SOURCE_DIR}\gfx.frag -o ${PROJECT_SOURCE_DIR}\gfx.h
+${COMPILER_COMMAND}
+${LINKER_COMMAND}
