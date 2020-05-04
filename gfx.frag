@@ -297,7 +297,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // if(d < 1.e2)
     {
         float res = 1.0;
-        float ph = 1e20;
+        float ph = 1.e20;
         for(int i=0; i<N; ++i)
         // for(d=1.e-2; x.z<.5; )
         {

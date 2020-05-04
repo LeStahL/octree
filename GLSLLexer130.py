@@ -135,10 +135,10 @@ class GLSLLexer130:
         pass
     
     def token(self):
-        if self.index == len(self.source)-1: return None
+        if self.index == len(self.source): return None
         while self.source[self.index] in [ ' ', '\t' ]: 
             self.index = min(self.index+1,len(self.source)-1)
-            if self.index == len(self.source)-1:
+            if self.index == len(self.source):
                 return None
                 
         longestMatchIndex = -1

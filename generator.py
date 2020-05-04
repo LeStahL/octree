@@ -86,27 +86,104 @@ def tokenIsPreprocessorDirective(token):
             return True
     return False
 
+def generateIdentifier(characters, numbers, index):
+    characterKeys = list(characters.keys())
+    numberKeys = list(numbers.keys())
+    
+    if index < len(characterKeys):
+        return characterKeys[index]
+    else:
+        return characterKeys[index % len(characterKeys)] + numberKeys[index // len(characterKeys)]
+
 def compressSource(source):
     lexer = GLSLLexer130.GLSLLexer130(source)
     token = lexer.token()
     smallerSource = ""
     lineHasPreprocessorDirective = False
     
+    characters = {}
+    numbers = {}
+    for character in source:
+        if not character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            if character in "0123456789":
+                if character in numbers:
+                    numbers[character] += 1
+                else:
+                    numbers[character] = 1
+            continue
+        if character in characters:
+            characters[character] += 1
+        else:
+            characters[character] = 1
+    characters = {k: v for k, v in reversed(sorted(characters.items(), key=lambda item: item[1]))}
+    numbers = {k: v for k, v in reversed(sorted(numbers.items(), key=lambda item: item[1]))}
+
+    isUniform = False
+    uniforms = []
+    ids = {}
+
+    # Simple optimizations
     while token != None:
-        if tokenIsPreprocessorDirective(token):
-            lineHasPreprocessorDirective = True
-            smallerSource += "\\n"
         if (not tokenIs(token, "SINGLELINE_COMMENT")) and (not tokenIs(token, "MULTILINE_COMMENT")):
             smallerSource += token.tokenData
             if tokenNeedsSpace(token):
                 smallerSource += ' '
-        if tokenIs(token, "CRLF"):
-            if lineHasPreprocessorDirective:
-                smallerSource += "\\n"
-            lineHasPreprocessorDirective = False
+        
+        if tokenIs(token, "UNIFORM"):
+            isUniform = True
+        if tokenIs(token, "SEMICOLON"):
+            isUniform = False
+        if tokenIs(token, "IDENTIFIER"):
+            if isUniform:
+                uniforms += [ token.tokenData ]
+            if not (token.tokenData in uniforms):
+                if token.tokenData in ids:
+                    ids[token.tokenData] += 1
+                else:
+                    ids[token.tokenData] = 1
         token = lexer.token()
     
-    return smallerSource
+    # Sort the ids by probability
+    ids = {k: v for k, v in reversed(sorted(ids.items(), key=lambda item: item[1]))}
+    idList = list(ids.keys())
+
+    dictionary = {}
+    for i in range(len(idList)):
+        id = idList[i]
+        dictionary[id] = generateIdentifier(characters, numbers, i)
+
+    # print(smallerSource)
+    # f = open("smallerSource", "wt")
+    # f.write(smallerSource)
+    # f.close()
+
+    # Context model optimizations
+    smallestSource = ""
+    lexer = GLSLLexer130.GLSLLexer130(smallerSource)
+    token = lexer.token()
+    while token != None:
+        if tokenIsPreprocessorDirective(token):
+            lineHasPreprocessorDirective = True
+            smallestSource += "\\n"
+        if tokenIs(token, "CRLF"):
+            if lineHasPreprocessorDirective:
+                smallestSource += "\\n"
+            lineHasPreprocessorDirective = False
+        if tokenIs(token, "IDENTIFIER"):
+            smallestSource += dictionary[token.tokenData]
+        else:
+            smallestSource += token.tokenData
+            if tokenNeedsSpace(token):
+                smallestSource += ' '
+        # print(token.tokenData)
+        token = lexer.token()
+    
+    # print(smallestSource)
+    ff = open("smallestSource", "wt")
+    ff.write(smallestSource)
+    ff.close()
+
+    return smallestSource
 
 def sourceVariable(name, source):
     ret = "const char *" + name + " =\n"
