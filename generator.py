@@ -179,9 +179,9 @@ def compressSource(source):
         token = lexer.token()
     
     # print(smallestSource)
-    ff = open("smallestSource", "wt")
-    ff.write(smallestSource)
-    ff.close()
+    # ff = open("smallestSource", "wt")
+    # ff.write(smallestSource)
+    # ff.close()
 
     return smallestSource
 
